@@ -3,209 +3,482 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sensor Console — Hackathon Starter</title>
+  <title>DeskBuddy Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <style>
     :root {
-      --bg: #0b0e0c;
-      --panel: #121613;
-      --line: #232925;
-      --text: #d7ddd9;
-      --amber: #ffb454;
-      --green: #5fd068;
-      --red: #ff6b5c;
+      --bg:       #0b0e0c;
+      --panel:    #121613;
+      --panel2:   #181d19;
+      --line:     #232925;
+      --text:     #d7ddd9;
+      --muted:    #8a9590;
+      --amber:    #ffb454;
+      --green:    #5fd068;
+      --blue:     #7cc7ff;
+      --red:      #ff6b5c;
+      --ring-bg:  #1e2620;
+
+      --duration-fast:   150ms;
+      --duration-normal: 300ms;
+      --ease-out:        cubic-bezier(0.16, 1, 0.3, 1);
     }
-    * { box-sizing: border-box; }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      margin: 0;
       font-family: "IBM Plex Mono", monospace;
       background: var(--bg);
       color: var(--text);
-      padding: 2rem;
+      padding: 2rem 1.5rem;
+      min-height: 100dvh;
     }
-    .wrap { max-width: 760px; margin: 0 auto; }
-    h1 {
-      font-size: 1.4rem;
-      letter-spacing: 0.04em;
-      margin-bottom: 0.25rem;
-    }
-    h1::before { content: "// "; color: var(--green); }
-    .sub { color: #8a9590; font-size: 0.85rem; margin-bottom: 1.5rem; }
 
-    .grid {
+    .wrap { max-width: 820px; margin: 0 auto; }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 0.35rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+    h1 .icon { color: var(--amber); margin-right: 0.45rem; }
+    h1 .name { color: var(--text); }
+    h1 .tagline {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-weight: 400;
+      letter-spacing: 0.02em;
+      margin-left: 0.6rem;
+    }
+
+    .status-line {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .status-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      flex-shrink: 0;
+      animation: blink 2.4s ease-in-out infinite;
+    }
+    @keyframes blink { 50% { opacity: 0.25; } }
+
+    /* ── Main layout ── */
+    .main-row {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
     }
-    .stat {
-      border: 1px solid var(--line);
-      background: var(--panel);
-      border-radius: 10px;
-      padding: 0.9rem 1rem;
+    @media (max-width: 600px) {
+      .main-row { grid-template-columns: 1fr; }
     }
-    .stat .label { font-size: 0.7rem; color: #8a9590; text-transform: uppercase; letter-spacing: 0.08em; }
-    .stat .value { font-size: 1.6rem; color: var(--amber); margin-top: 0.25rem; }
 
     .panel {
       border: 1px solid var(--line);
       background: var(--panel);
-      border-radius: 12px;
-      padding: 1.25rem;
-      margin-bottom: 1.25rem;
+      border-radius: 14px;
+      padding: 1.25rem 1.4rem;
     }
-    .panel h2 {
-      font-size: 0.9rem;
+    .panel-label {
+      font-size: 0.68rem;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #8a9590;
-      margin: 0 0 1rem 0;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 1rem;
     }
 
-    .alert {
-      border: 1px solid var(--red);
+    /* ── Focus timer ── */
+    .focus-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+    .ring-wrap {
+      position: relative;
+      width: 160px;
+      height: 160px;
+    }
+    .ring-wrap svg {
+      transform: rotate(-90deg);
+    }
+    .ring-bg   { fill: none; stroke: var(--ring-bg); stroke-width: 8; }
+    .ring-prog {
+      fill: none;
+      stroke: var(--amber);
+      stroke-width: 8;
+      stroke-linecap: round;
+      transition: stroke-dashoffset var(--duration-normal) var(--ease-out);
+    }
+    .ring-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .timer-digits {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--amber);
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .timer-unit {
+      font-size: 0.65rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      margin-top: 0.2rem;
+    }
+
+    /* ── Break badge ── */
+    .break-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.3rem 0.9rem;
+      border-radius: 100px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      border: 1.5px solid transparent;
+      transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
+    }
+    .break-badge.working {
+      background: #1a201b;
+      color: var(--muted);
+      border-color: var(--line);
+    }
+    .break-badge.on-break {
+      background: #122918;
+      color: var(--green);
+      border-color: #2a5c32;
+    }
+    .break-badge.due-soon {
+      background: #2a1e0a;
+      color: var(--amber);
+      border-color: #5c3d10;
+    }
+    .break-badge.overdue {
+      background: #2a0e0d;
+      color: var(--red);
+      border-color: #5c2420;
+      animation: blink 1.2s ease-in-out infinite;
+    }
+    .break-badge .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* ── Nudge ── */
+    .nudge-area { text-align: center; }
+    #nudge-btn {
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      background: #1a2d1c;
+      color: var(--green);
+      border: 1.5px solid #2a5c32;
+      border-radius: 8px;
+      padding: 0.5rem 1.1rem;
+      transition: background var(--duration-fast), transform var(--duration-fast);
+    }
+    #nudge-btn:hover { background: #213823; transform: translateY(-1px); }
+    #nudge-btn:active { transform: translateY(0); }
+    #nudge-text {
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      color: var(--text);
+      line-height: 1.55;
+      min-height: 2.4rem;
+      font-style: italic;
+    }
+
+    /* ── Environment meters ── */
+    .env-panel { display: flex; flex-direction: column; gap: 1rem; }
+    .env-row { display: flex; flex-direction: column; gap: 0.35rem; }
+    .env-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+    .env-val { color: var(--text); font-weight: 500; }
+    .meter-track {
+      height: 6px;
+      background: var(--ring-bg);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .meter-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width var(--duration-normal) var(--ease-out);
+    }
+    .meter-fill.temp  { background: var(--amber); }
+    .meter-fill.hum   { background: var(--blue); }
+    .meter-fill.light { background: #e6e66a; }
+
+    /* ── Alerts ── */
+    #alerts { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .alert-msg {
+      border: 1px solid #5c2420;
+      background: #1a0e0d;
       color: var(--red);
       border-radius: 8px;
-      padding: 0.6rem 0.9rem;
-      font-size: 0.85rem;
-      margin-bottom: 0.5rem;
+      padding: 0.55rem 0.9rem;
+      font-size: 0.8rem;
     }
 
-    .servo-row { display: flex; align-items: center; gap: 1rem; }
-    input[type="range"] { flex: 1; }
-    .servo-val { width: 4ch; text-align: right; color: var(--green); }
-
-    .status-dot {
-      display: inline-block;
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--green);
-      margin-right: 0.4rem;
-      animation: blink 2s infinite;
-    }
-    @keyframes blink { 50% { opacity: 0.3; } }
+    /* ── History chart ── */
+    .chart-panel { margin-bottom: 1rem; }
+    .chart-panel canvas { display: block; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>SENSOR CONSOLE</h1>
-    <p class="sub"><span class="status-dot"></span>polling /api/latest every 1.5s — waiting for ESP32 data</p>
+<div class="wrap">
 
-    <div class="grid" id="stat-grid">
-      <!-- Filled dynamically based on whatever keys your ESP32 sends -->
-    </div>
+  <header>
+    <h1>
+      <span class="icon">&#x23F1;</span>
+      <span class="name">DeskBuddy</span>
+      <span class="tagline">— your desk companion</span>
+    </h1>
+  </header>
+  <p class="status-line">
+    <span class="status-dot"></span>
+    <span id="status-text">polling /api/latest every 1.5 s — waiting for ESP32 data</span>
+  </p>
 
-    <div id="alerts"></div>
+  <!-- Main two-column row -->
+  <div class="main-row">
 
-    <div class="panel">
-      <h2>Live Readings</h2>
-      <canvas id="chart" height="180"></canvas>
-    </div>
+    <!-- Focus timer -->
+    <div class="panel focus-panel">
+      <div class="panel-label">Focus timer</div>
 
-    {% if esp32_configured %}
-    <div class="panel">
-      <h2>Servo Control</h2>
-      <div class="servo-row">
-        <input type="range" id="servo" min="0" max="180" value="90" />
-        <span class="servo-val" id="servo-val">90°</span>
+      <div class="ring-wrap">
+        <svg viewBox="0 0 160 160" width="160" height="160">
+          <circle class="ring-bg"   cx="80" cy="80" r="68" />
+          <circle class="ring-prog" cx="80" cy="80" r="68"
+            id="ring"
+            stroke-dasharray="427.26"
+            stroke-dashoffset="427.26" />
+        </svg>
+        <div class="ring-center">
+          <div class="timer-digits" id="timer-digits">--</div>
+          <div class="timer-unit">min worked</div>
+        </div>
+      </div>
+
+      <div id="break-badge" class="break-badge working">
+        <span class="dot"></span>
+        <span id="break-label">WORKING</span>
+      </div>
+
+      <div class="nudge-area">
+        <button id="nudge-btn">Get Nudge</button>
+        <p id="nudge-text"></p>
       </div>
     </div>
-    {% else %}
+
+    <!-- Environment stats -->
     <div class="panel">
-      <h2>Servo Control</h2>
-      <p class="sub" style="margin:0">
-        Set ESP32_SERVO_URL in dashboard/.env and restart to enable the servo slider.
-      </p>
+      <div class="panel-label">Environment</div>
+      <div class="env-panel">
+        <div class="env-row">
+          <div class="env-header">
+            <span>TEMPERATURE</span>
+            <span class="env-val" id="val-temp">--</span>
+          </div>
+          <div class="meter-track"><div class="meter-fill temp" id="bar-temp" style="width:0%"></div></div>
+        </div>
+        <div class="env-row">
+          <div class="env-header">
+            <span>HUMIDITY</span>
+            <span class="env-val" id="val-hum">--</span>
+          </div>
+          <div class="meter-track"><div class="meter-fill hum" id="bar-hum" style="width:0%"></div></div>
+        </div>
+        <div class="env-row">
+          <div class="env-header">
+            <span>LIGHT LEVEL</span>
+            <span class="env-val" id="val-light">--</span>
+          </div>
+          <div class="meter-track"><div class="meter-fill light" id="bar-light" style="width:0%"></div></div>
+        </div>
+      </div>
     </div>
-    {% endif %}
   </div>
 
-  <script>
-    const ctx = document.getElementById('chart');
-    const chart = new Chart(ctx, {
-      type: 'line',
-      data: { labels: [], datasets: [] },
-      options: {
-        responsive: true,
-        animation: false,
-        scales: {
-          x: { ticks: { color: '#8a9590' }, grid: { color: '#232925' } },
-          y: { ticks: { color: '#8a9590' }, grid: { color: '#232925' } },
-        },
-        plugins: { legend: { labels: { color: '#d7ddd9' } } },
+  <!-- Alerts -->
+  <div id="alerts"></div>
+
+  <!-- History chart -->
+  <div class="panel chart-panel">
+    <div class="panel-label">Live readings</div>
+    <canvas id="chart" height="160"></canvas>
+  </div>
+
+</div><!-- /.wrap -->
+
+<script>
+  /* ── Chart setup ── */
+  const ctx = document.getElementById('chart');
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive: true,
+      animation: false,
+      scales: {
+        x: { ticks: { color: '#8a9590', maxTicksLimit: 8 }, grid: { color: '#1e2620' } },
+        y: { ticks: { color: '#8a9590' }, grid: { color: '#1e2620' } },
       },
-    });
+      plugins: { legend: { labels: { color: '#d7ddd9', boxWidth: 12 } } },
+    },
+  });
 
-    const COLORS = ['#ffb454', '#5fd068', '#7cc7ff', '#ff6b5c'];
-    const SKIP_KEYS = new Set(['timestamp', 'alerts']);
+  const CHART_COLORS = { temperature: '#ffb454', light: '#7cc7ff' };
+  const SKIP_KEYS   = new Set(['timestamp', 'alerts', 'device', 'nudge_active', 'minutes_since_break']);
 
-    async function poll() {
+  /* ── Ring helper ── */
+  const CIRCUMFERENCE = 2 * Math.PI * 68; // r=68
+  const POMODORO_MIN  = 25;
+
+  function setRing(minutes) {
+    const pct    = Math.min(1, minutes / POMODORO_MIN);
+    const offset = CIRCUMFERENCE * (1 - pct);
+    document.getElementById('ring').style.strokeDashoffset = offset;
+  }
+
+  /* ── Main poll ── */
+  async function poll() {
+    try {
+      const res  = await fetch('/api/latest');
+      const data = await res.json();
+      if (!data.length) return;
+
+      const latest = data[data.length - 1];
+
+      // Status line
+      const ago = Math.round((Date.now() / 1000) - latest.timestamp);
+      document.getElementById('status-text').textContent =
+        `last reading ${ago}s ago — ${data.length} samples`;
+
+      // Focus timer + ring
+      const mins = latest.minutes_since_break ?? 0;
+      document.getElementById('timer-digits').textContent = mins;
+      setRing(mins);
+
+      // Break badge — also fetch /api/status for authoritative nudge state
+      let nudgeActive = latest.nudge_active ?? false;
       try {
-        const res = await fetch('/api/latest');
-        const data = await res.json();
-        if (data.length === 0) return;
+        const sRes   = await fetch('/api/status');
+        const sData  = await sRes.json();
+        nudgeActive  = sData.nudge_active ?? nudgeActive;
+      } catch (_) { /* fall back to latest reading */ }
 
-        const latest = data[data.length - 1];
-
-        // Stat tiles
-        const grid = document.getElementById('stat-grid');
-        grid.innerHTML = '';
-        Object.entries(latest).forEach(([key, val]) => {
-          if (SKIP_KEYS.has(key)) return;
-          const tile = document.createElement('div');
-          tile.className = 'stat';
-          tile.innerHTML = `<div class="label">${key}</div><div class="value">${typeof val === 'number' ? val.toFixed(1) : val}</div>`;
-          grid.appendChild(tile);
-        });
-
-        // Alerts
-        const alertsEl = document.getElementById('alerts');
-        alertsEl.innerHTML = '';
-        (latest.alerts || []).forEach((msg) => {
-          const div = document.createElement('div');
-          div.className = 'alert';
-          div.textContent = '⚠ ' + msg;
-          alertsEl.appendChild(div);
-        });
-
-        // Chart — one dataset per numeric key
-        const keys = Object.keys(latest).filter((k) => !SKIP_KEYS.has(k) && typeof latest[k] === 'number');
-        chart.data.labels = data.map((d) => new Date(d.timestamp * 1000).toLocaleTimeString());
-        chart.data.datasets = keys.map((key, i) => ({
-          label: key,
-          data: data.map((d) => d[key]),
-          borderColor: COLORS[i % COLORS.length],
-          tension: 0.3,
-          pointRadius: 0,
-        }));
-        chart.update();
-      } catch (e) {
-        console.error('poll failed', e);
+      const minLeft = Math.max(0, 25 - mins);
+      const badge   = document.getElementById('break-badge');
+      const label   = document.getElementById('break-label');
+      if (nudgeActive) {
+        badge.className   = 'break-badge overdue';
+        label.textContent = 'BREAK OVERDUE';
+      } else if (minLeft <= 5) {
+        badge.className   = 'break-badge due-soon';
+        label.textContent = 'BREAK SOON (' + minLeft + ' min)';
+      } else {
+        badge.className   = 'break-badge working';
+        label.textContent = 'WORKING';
       }
-    }
-    setInterval(poll, 1500);
-    poll();
 
-    // Servo slider
-    const servo = document.getElementById('servo');
-    if (servo) {
-      const valEl = document.getElementById('servo-val');
-      let timeout;
-      servo.addEventListener('input', () => {
-        valEl.textContent = servo.value + '°';
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
-          fetch('/api/command', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ angle: parseInt(servo.value, 10) }),
-          });
-        }, 150);
+      // Environment meters
+      const temp     = latest.temperature ?? 0;
+      const hum      = latest.humidity    ?? 0;
+      const lightRaw = latest.light       ?? 0;
+      const lightPct = Math.min(100, Math.round(lightRaw / 40));
+
+      document.getElementById('val-temp').textContent  = temp.toFixed(1) + ' °C';
+      document.getElementById('val-hum').textContent   = hum.toFixed(0)  + ' %RH';
+      document.getElementById('val-light').textContent = lightPct + ' / 100';
+
+      // Temp bar: 15°C = 0%, 35°C = 100%
+      document.getElementById('bar-temp').style.width  = Math.max(0, Math.min(100, (temp - 15) / 20 * 100)) + '%';
+      document.getElementById('bar-hum').style.width   = Math.min(100, hum) + '%';
+      document.getElementById('bar-light').style.width = lightPct + '%';
+
+      // Alerts
+      const alertsEl = document.getElementById('alerts');
+      alertsEl.innerHTML = '';
+      (latest.alerts || []).forEach((msg) => {
+        const div = document.createElement('div');
+        div.className   = 'alert-msg';
+        div.textContent = '⚠ ' + msg;
+        alertsEl.appendChild(div);
       });
+
+      // Chart — temperature and light only
+      const CHART_KEYS = ['temperature', 'light'];
+      chart.data.labels   = data.map(d => new Date(d.timestamp * 1000).toLocaleTimeString());
+      chart.data.datasets = CHART_KEYS.filter(k => latest[k] !== undefined).map(key => ({
+        label:       key,
+        data:        data.map(d => d[key]),
+        borderColor: CHART_COLORS[key] ?? '#8a9590',
+        tension:     0.3,
+        pointRadius: 0,
+      }));
+      chart.update();
+
+    } catch (e) {
+      console.error('poll failed', e);
     }
-  </script>
+  }
+
+  setInterval(poll, 1500);
+  poll();
+
+  /* ── Nudge button ── */
+  document.getElementById('nudge-btn').addEventListener('click', async () => {
+    const btn  = document.getElementById('nudge-btn');
+    const text = document.getElementById('nudge-text');
+    btn.textContent = 'Thinking...';
+    btn.disabled    = true;
+    try {
+      const res  = await fetch('/api/nudge');
+      const data = await res.json();
+      text.textContent = data.nudge || 'No nudge returned.';
+    } catch (e) {
+      text.textContent = 'Could not reach nudge endpoint.';
+    } finally {
+      btn.textContent = 'Get Nudge';
+      btn.disabled    = false;
+    }
+  });
+</script>
 </body>
 </html>
