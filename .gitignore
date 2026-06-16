@@ -1,0 +1,15 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Node / Vite
+node_modules/
+dist/
+
+# RAG index cache
+backend/data/_embeddings.json
+
+# OS junk
+.DS_Store

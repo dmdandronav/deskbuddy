@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sensor Console — Hackathon Starter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    :root {
+      --bg: #0b0e0c;
+      --panel: #121613;
+      --line: #232925;
+      --text: #d7ddd9;
+      --amber: #ffb454;
+      --green: #5fd068;
+      --red: #ff6b5c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Mono", monospace;
+      background: var(--bg);
+      color: var(--text);
+      padding: 2rem;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; }
+    h1 {
+      font-size: 1.4rem;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.25rem;
+    }
+    h1::before { content: "// "; color: var(--green); }
+    .sub { color: #8a9590; font-size: 0.85rem; margin-bottom: 1.5rem; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+    }
+    .stat .label { font-size: 0.7rem; color: #8a9590; text-transform: uppercase; letter-spacing: 0.08em; }
+    .stat .value { font-size: 1.6rem; color: var(--amber); margin-top: 0.25rem; }
+
+    .panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .panel h2 {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #8a9590;
+      margin: 0 0 1rem 0;
+    }
+
+    .alert {
+      border: 1px solid var(--red);
+      color: var(--red);
+      border-radius: 8px;
+      padding: 0.6rem 0.9rem;
+      font-size: 0.85rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .servo-row { display: flex; align-items: center; gap: 1rem; }
+    input[type="range"] { flex: 1; }
+    .servo-val { width: 4ch; text-align: right; color: var(--green); }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      margin-right: 0.4rem;
+      animation: blink 2s infinite;
+    }
+    @keyframes blink { 50% { opacity: 0.3; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>SENSOR CONSOLE</h1>
+    <p class="sub"><span class="status-dot"></span>polling /api/latest every 1.5s — waiting for ESP32 data</p>
+
+    <div class="grid" id="stat-grid">
+      <!-- Filled dynamically based on whatever keys your ESP32 sends -->
+    </div>
+
+    <div id="alerts"></div>
+
+    <div class="panel">
+      <h2>Live Readings</h2>
+      <canvas id="chart" height="180"></canvas>
+    </div>
+
+    {% if esp32_configured %}
+    <div class="panel">
+      <h2>Servo Control</h2>
+      <div class="servo-row">
+        <input type="range" id="servo" min="0" max="180" value="90" />
+        <span class="servo-val" id="servo-val">90°</span>
+      </div>
+    </div>
+    {% else %}
+    <div class="panel">
+      <h2>Servo Control</h2>
+      <p class="sub" style="margin:0">
+        Set ESP32_SERVO_URL in dashboard/.env and restart to enable the servo slider.
+      </p>
+    </div>
+    {% endif %}
+  </div>
+
+  <script>
+    const ctx = document.getElementById('chart');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: { labels: [], datasets: [] },
+      options: {
+        responsive: true,
+        animation: false,
+        scales: {
+          x: { ticks: { color: '#8a9590' }, grid: { color: '#232925' } },
+          y: { ticks: { color: '#8a9590' }, grid: { color: '#232925' } },
+        },
+        plugins: { legend: { labels: { color: '#d7ddd9' } } },
+      },
+    });
+
+    const COLORS = ['#ffb454', '#5fd068', '#7cc7ff', '#ff6b5c'];
+    const SKIP_KEYS = new Set(['timestamp', 'alerts']);
+
+    async function poll() {
+      try {
+        const res = await fetch('/api/latest');
+        const data = await res.json();
+        if (data.length === 0) return;
+
+        const latest = data[data.length - 1];
+
+        // Stat tiles
+        const grid = document.getElementById('stat-grid');
+        grid.innerHTML = '';
+        Object.entries(latest).forEach(([key, val]) => {
+          if (SKIP_KEYS.has(key)) return;
+          const tile = document.createElement('div');
+          tile.className = 'stat';
+          tile.innerHTML = `<div class="label">${key}</div><div class="value">${typeof val === 'number' ? val.toFixed(1) : val}</div>`;
+          grid.appendChild(tile);
+        });
+
+        // Alerts
+        const alertsEl = document.getElementById('alerts');
+        alertsEl.innerHTML = '';
+        (latest.alerts || []).forEach((msg) => {
+          const div = document.createElement('div');
+          div.className = 'alert';
+          div.textContent = '⚠ ' + msg;
+          alertsEl.appendChild(div);
+        });
+
+        // Chart — one dataset per numeric key
+        const keys = Object.keys(latest).filter((k) => !SKIP_KEYS.has(k) && typeof latest[k] === 'number');
+        chart.data.labels = data.map((d) => new Date(d.timestamp * 1000).toLocaleTimeString());
+        chart.data.datasets = keys.map((key, i) => ({
+          label: key,
+          data: data.map((d) => d[key]),
+          borderColor: COLORS[i % COLORS.length],
+          tension: 0.3,
+          pointRadius: 0,
+        }));
+        chart.update();
+      } catch (e) {
+        console.error('poll failed', e);
+      }
+    }
+    setInterval(poll, 1500);
+    poll();
+
+    // Servo slider
+    const servo = document.getElementById('servo');
+    if (servo) {
+      const valEl = document.getElementById('servo-val');
+      let timeout;
+      servo.addEventListener('input', () => {
+        valEl.textContent = servo.value + '°';
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          fetch('/api/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ angle: parseInt(servo.value, 10) }),
+          });
+        }, 150);
+      });
+    }
+  </script>
+</body>
+</html>
