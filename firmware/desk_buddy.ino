@@ -76,8 +76,8 @@ void loop() {
 
   unsigned long elapsed = millis() - lastBreakMillis;
   int minutesSinceBreak = elapsed / 60000;
-  int secondsLeft = (BREAK_INTERVAL - elapsed) / 1000;
-  int minutesLeft = secondsLeft / 60;
+  // Clamp: unsigned subtraction would wrap huge once the break is overdue.
+  int minutesLeft = elapsed >= BREAK_INTERVAL ? 0 : (BREAK_INTERVAL - elapsed) / 60000;
 
   // Nudge when overdue
   if (elapsed > BREAK_INTERVAL && !nudgeActive) {
